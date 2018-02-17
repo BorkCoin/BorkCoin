@@ -12,7 +12,7 @@ contract Bork {
 
   mapping(address => uint256) balances;
 
-  function Bork(address _creator, string _name, uint256 _totalSupply, int[] _data) {
+  function Bork(address _creator, string _name, uint256 _totalSupply, int[] _data) public {
     name = _name;
     totalSupply = _totalSupply;
     data = _data;
@@ -32,35 +32,25 @@ contract Bork {
     balances[_from] = balances[_from].sub(_value);
   }
 
-  function mint(address _to, uint256 _amount) external {
-    if (_to == 0x0) revert();
-    if (balances[_to].add(_amount) > totalSupply) revert();
-
-    balances[_to] = balances[_to].add(_amount);
-  }
-
 }
 
 contract BorkCoin is Ownable {
   using SafeMath for uint256;
 
-  string public name;
-  string public symbol;
-  uint256 public decimals;
+  string public name = "Bork Coin";
+  string public symbol = "BKC";
+  uint256 public decimals = 0;
   address[] private borks;
   address[] private pendingBorks;
   mapping(address => address[]) public approvalPool;
   mapping(address => address[]) public declinePool;
 
-  uint private maximumBorks;
+  uint private maximumBorks = 20;
   mapping(address => uint256) public balances;
   address[] private eliteBorkers;
+  uint private maximumEliteBorkers = 5;
 
   function BorkCoin() public {
-    name = "Bork Coin";
-    symbol = "BKC";
-    decimals = 0;
-    maximumBorks = 20;
     eliteBorkers.push(msg.sender);
   }
 
@@ -75,7 +65,7 @@ contract BorkCoin is Ownable {
   }
 
   function addEliteBorker(address _newGuy) public onlyOwner {
-    if (eliteBorkers.length >= 5) revert();
+    if (eliteBorkers.length >= maximumEliteBorkers) revert();
 
     eliteBorkers.push(_newGuy);
   }
@@ -88,7 +78,7 @@ contract BorkCoin is Ownable {
     return eliteBorkers.length; // Returns a number greater than max index
   }
 
-  function hasEliteBorkerVoted(address _eliteBorker, address[] arr) private view returns (bool) {
+  function hasEliteBorkerVoted(address _eliteBorker, address[] arr) private pure returns (bool) {
     for(uint i = 0; i<arr.length; i++) {
       if(_eliteBorker == arr[i]) return true;
     }
@@ -107,7 +97,7 @@ contract BorkCoin is Ownable {
     eliteBorkers.length--;
   }
 
-  function createBork(string _name, uint256 _totalSupply, int[] _data) onlyEliteBorker {
+  function createBork(string _name, uint256 _totalSupply, int[] _data) public onlyEliteBorker {
     // TODO: Check if name already exists???
     if (borks.length > maximumBorks) revert();
     address newBork = new Bork(msg.sender, _name, _totalSupply, _data);
