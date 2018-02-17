@@ -15,7 +15,8 @@ contract Bork {
   address[] private declinePool;
   enum State { Pending, Approved, Rejected, Published }
   uint private state;
-  address[] public committee;
+  address[] private committee;
+  uint public created;
 
   mapping(address => uint256) public balances;
 
@@ -28,6 +29,7 @@ contract Bork {
     price = _price;
     state = uint(State.Pending);
     committee = _committee;
+    created = now;
 
     if (_totalSupply < 5) revert(); // One for the approvers, one for the creator
   }
@@ -113,6 +115,8 @@ contract BorkCoin is Ownable {
   uint256 public decimals = 0;
   address[] private borks;
 
+  enum State { Pending, Approved, Rejected, Published }
+
   uint private maximumBorks = 20;
   address[] private eliteBorkers;
   uint private maximumEliteBorkers = 5;
@@ -140,6 +144,12 @@ contract BorkCoin is Ownable {
 
   function addEliteBorker(address _newGuy) public onlyOwner {
     if (eliteBorkers.length >= maximumEliteBorkers) revert();
+
+    for(uint i = 0; i<eliteBorkers.length; i++) {
+      if(_newGuy == eliteBorkers[i]) revert();
+    }
+
+
     eliteBorkers.push(_newGuy);
   }
 
