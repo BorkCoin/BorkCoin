@@ -52,6 +52,7 @@ contract Bork {
     if (_to == 0x0) revert();
     if (balances[msg.sender] < _value) revert();
     if (balances[_to].add(_value) < balances[_to]) revert();
+    if (state != uint(State.Published)) revert();
     balances[_to] = balances[_to].add(_value);
     balances[msg.sender] = balances[msg.sender].sub(_value);
   }
@@ -59,6 +60,7 @@ contract Bork {
   function buy() external payable {
     if (msg.sender == 0x0) revert();
     if (msg.value != price) revert();
+    if (state != uint(State.Published)) revert();
     if (balances[msg.sender].add(1) > totalSupply) revert();
 
     balances[msg.sender] = balances[msg.sender].add(1);
@@ -111,7 +113,7 @@ contract BorkCoin is Ownable {
   using SafeMath for uint256;
 
   string public name = "Bork Coin";
-  string public symbol = "BKC";
+  string public symbol = "BORK";
   uint256 public decimals = 0;
   address[] private borks;
 
@@ -178,5 +180,13 @@ contract BorkCoin is Ownable {
     address newBork = new Bork(msg.sender, eliteBorkers, _price, _type, _name, _totalSupply, _data);
     borks.push(newBork);
   }
+
+  function isEliteBorker(address _address) public view returns (bool) {
+    for(uint i = 0; i < eliteBorkers.length; i++) {
+      if(_address == eliteBorkers[i]) return true;
+    }
+
+    return false;
+}
 
 }
