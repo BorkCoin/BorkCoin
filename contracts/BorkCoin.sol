@@ -35,6 +35,18 @@ contract Bork {
     if (_totalSupply < 5) revert(); // One for the approvers, one for the creator
   }
 
+  function getCommitteeCount() external view returns (uint256) {
+    return committee.length;
+  }
+
+  function getApprovalCount() external view returns (uint256) {
+    return approvalPool.length;
+  }
+
+  function getDeclineCount() external view returns (uint256) {
+    return declinePool.length;
+  }
+
   function balanceOf(address _owner) external view returns (uint256 balance) {
       return balances[_owner];
   }
@@ -148,7 +160,7 @@ contract BorkCoin is Ownable {
   string public name = "Bork Coin";
   string public symbol = "BORK";
   uint256 public decimals = 0;
-  address[] private borks;
+  address[] public borks;
 
   enum State { Pending, Approved, Rejected, Published }
 
@@ -158,6 +170,14 @@ contract BorkCoin is Ownable {
 
   function BorkCoin() public {
     eliteBorkers.push(msg.sender);
+  }
+
+  function getBorkCount() external view returns (uint256) {
+    return borks.length;
+  }
+
+  function getEliteCount() external view returns (uint256) {
+    return eliteBorkers.length;
   }
 
   function balanceOf(address _owner) external view returns (uint256 balance) {
