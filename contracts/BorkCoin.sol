@@ -14,7 +14,7 @@ contract Bork {
   address[] private declinePool;
   enum State { Pending, Approved, Rejected, Published }
   uint private state;
-  address[] private committee;
+  address private parentContract;
   uint public created;
   uint256 public startingPrice;
 
@@ -22,7 +22,7 @@ contract Bork {
   mapping(address => uint256) public pricePerCoin;
   mapping(address => uint256) public balances;
 
-  function Bork(address _creator, address[] _committee, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, int[] _data) public {
+  function Bork(address _parentContract, address _creator, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, int[] _data) public {
     name = _name;
     totalSupply = _totalSupply;
     data = _data;
@@ -30,14 +30,10 @@ contract Bork {
     data_type = _type;
     startingPrice = _pricePerCoin;
     state = uint(State.Pending);
-    committee = _committee;
     created = now;
+    parentContract = _parentContract;
 
     if (_totalSupply < 5) revert(); // One for the approvers, one for the creator
-  }
-
-  function getCommitteeCount() external view returns (uint256) {
-    return committee.length;
   }
 
   function getApprovalCount() external view returns (uint256) {
@@ -55,16 +51,6 @@ contract Bork {
   function retrieveBorkData() external view returns (int[]) {
     if (balances[msg.sender] <= 0) revert();
     return data;
-  }
-
-  modifier onlyCommittee() {
-    bool exists = false;
-    for(uint i = 0; i < committee.length; i++) {
-      if(msg.sender == committee[i]) exists = true;
-    }
-
-    require(exists);
-    _;
   }
 
   function transferFrom(address _from, address _to, uint256 _value) private {
@@ -110,23 +96,25 @@ contract Bork {
     pricePerCoin[msg.sender] = 0;
   }
 
-  function approve(address _approver) onlyCommittee external {
+  function approve(address _approver) external {
+    if (BorkCoin(parentContract).isEliteBorker(_approver) == false) revert();
     if (hasAlreadyVoted(_approver, approvalPool)) revert();
     if (state != uint(State.Pending)) revert();
     approvalPool.push(_approver);
 
-    if (approvalPool.length > committee.length/2) {
+    if (approvalPool.length > BorkCoin(parentContract).eliteBorkerCount().div(2)) {
       state = uint(State.Approved);
     }
   }
 
-  function decline(address _decliner) onlyCommittee external {
+  function decline(address _decliner) external {
+    if (BorkCoin(parentContract).isEliteBorker(_decliner) == false) revert();
     if (hasAlreadyVoted(_decliner, declinePool)) revert();
     if (state != uint(State.Pending)) revert();
 
     declinePool.push(_decliner);
 
-    if (declinePool.length > committee.length/2) {
+    if (declinePool.length > BorkCoin(parentContract).eliteBorkerCount().div(2)) {
       state = uint(State.Rejected);
     }
   }
@@ -166,23 +154,22 @@ contract BorkCoin is Ownable {
   string public symbol = "BORK";
   uint256 public decimals = 0;
   address[] public borks;
+  mapping(address => uint256) public borkIndex;
 
   enum State { Pending, Approved, Rejected, Published }
 
-  uint private maximumBorks = 20;
-  address[] private eliteBorkers;
-  uint private maximumEliteBorkers = 5;
+  uint public maximumBorks = 20;
+  uint public eliteBorkerCount;
+  mapping(address => uint256) public eliteBorkers; // Starts 0 if not elite. 1 if elite
+  uint public maximumEliteBorkers = 5;
 
   function BorkCoin() public {
-    eliteBorkers.push(msg.sender);
+    eliteBorkers[msg.sender] = 1;
+    eliteBorkerCount = 1;
   }
 
   function getBorkCount() external view returns (uint256) {
     return borks.length;
-  }
-
-  function getEliteCount() external view returns (uint256) {
-    return eliteBorkers.length;
   }
 
   function balanceOf(address _owner) external view returns (uint256 balance) {
@@ -192,57 +179,30 @@ contract BorkCoin is Ownable {
       }
   }
 
-  modifier onlyEliteBorker() {
-    bool exists = false;
-    for(uint i = 0; i<eliteBorkers.length; i++) {
-      if(msg.sender == eliteBorkers[i]) exists = true;
-    }
-
-    require(exists);
-    _;
-  }
-
   function addEliteBorker(address _newGuy) public onlyOwner {
-    if (eliteBorkers.length >= maximumEliteBorkers) revert();
+    if (eliteBorkerCount >= maximumEliteBorkers) revert();
+    if (eliteBorkers[_newGuy] != 0) revert();
 
-    for(uint i = 0; i<eliteBorkers.length; i++) {
-      if(_newGuy == eliteBorkers[i]) revert();
-    }
-
-
-    eliteBorkers.push(_newGuy);
-  }
-
-  function getEliteBorkerIndex(address _eliteBorker) private view returns (uint) {
-    for(uint i = 0; i<eliteBorkers.length; i++) {
-      if(_eliteBorker == eliteBorkers[i]) return i; // Returns index
-    }
-
-    return eliteBorkers.length; // Returns a number greater than max index
+    eliteBorkers[_newGuy] = 1;
+    eliteBorkerCount = eliteBorkerCount.add(1);
   }
 
   function removeEliteBorker(address _loser) public onlyOwner {
-    if (eliteBorkers.length <= 0) revert();
+    if (eliteBorkerCount <= 0) revert();
+    if (eliteBorkers[_loser] == 0) revert();
 
-    uint index = getEliteBorkerIndex(_loser);   // Get Index of EliteBorker
-    if (index >= eliteBorkers.length) revert(); // Make sure we find someone
-
-    eliteBorkers[index] = eliteBorkers[eliteBorkers.length-1];
-    delete eliteBorkers[eliteBorkers.length - 1];
-    eliteBorkers.length--;
+    eliteBorkers[_loser] = 0;
   }
 
-  function createBork(string _name, uint256 _price, string _type, uint256 _totalSupply, int[] _data) public onlyEliteBorker {
+  function createBork(string _name, uint256 _price, string _type, uint256 _totalSupply, int[] _data) public {
     // TODO: Check if name already exists???
     if (borks.length > maximumBorks) revert();
-    address newBork = new Bork(msg.sender, eliteBorkers, _price, _type, _name, _totalSupply, _data);
+    address newBork = new Bork(this, msg.sender, _price, _type, _name, _totalSupply, _data);
     borks.push(newBork);
   }
 
   function isEliteBorker(address _address) public view returns (bool) {
-    for(uint i = 0; i < eliteBorkers.length; i++) {
-      if(_address == eliteBorkers[i]) return true;
-    }
+    if(eliteBorkers[_address] == 1) return true;
 
     return false;
   }
