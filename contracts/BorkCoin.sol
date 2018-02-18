@@ -10,8 +10,7 @@ contract Bork {
   uint256 public totalSupply;
   int[] private data;
   address public creator;
-  address[] private approvalPool;
-  address[] private declinePool;
+
   enum State { Pending, Approved, Rejected, Published }
   uint private state;
   address private parentContract;
@@ -21,6 +20,14 @@ contract Bork {
   mapping(address => uint256) public forSale;
   mapping(address => uint256) public pricePerCoin;
   mapping(address => uint256) public balances;
+
+  mapping(address => uint) public approvalPool;
+  address[] public approvers;
+  uint public approvedVoteCount = 0;
+
+  mapping(address => uint) public declinePool;
+  uint public declinedVoteCount = 0;
+
 
   function Bork(address _parentContract, address _creator, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, int[] _data) public {
     name = _name;
@@ -34,14 +41,6 @@ contract Bork {
     parentContract = _parentContract;
 
     if (_totalSupply < 5) revert(); // One for the approvers, one for the creator
-  }
-
-  function getApprovalCount() external view returns (uint256) {
-    return approvalPool.length;
-  }
-
-  function getDeclineCount() external view returns (uint256) {
-    return declinePool.length;
   }
 
   function balanceOf(address _owner) external view returns (uint256 balance) {
@@ -97,44 +96,45 @@ contract Bork {
   }
 
   function approve(address _approver) external {
-    if (BorkCoin(parentContract).isEliteBorker(_approver) == false) revert();
-    if (hasAlreadyVoted(_approver, approvalPool)) revert();
     if (state != uint(State.Pending)) revert();
-    approvalPool.push(_approver);
+    if (BorkCoin(parentContract).isEliteBorker(_approver) == false) revert();
+    if (hasAlreadyVoted(_approver)) revert();
+    approvalPool[_approver] = 1;
+    approvedVoteCount = approvedVoteCount.add(1);
+    approvers.push(_approver);
 
-    if (approvalPool.length > BorkCoin(parentContract).eliteBorkerCount().div(2)) {
+    if (approvedVoteCount > BorkCoin(parentContract).eliteBorkerCount().div(2)) {
       state = uint(State.Approved);
     }
   }
 
   function decline(address _decliner) external {
-    if (BorkCoin(parentContract).isEliteBorker(_decliner) == false) revert();
-    if (hasAlreadyVoted(_decliner, declinePool)) revert();
     if (state != uint(State.Pending)) revert();
+    if (BorkCoin(parentContract).isEliteBorker(_decliner) == false) revert();
+    if (hasAlreadyVoted(_decliner)) revert();
+    declinePool[_decliner] = 1;
+    declinedVoteCount = declinedVoteCount.add(1);
 
-    declinePool.push(_decliner);
-
-    if (declinePool.length > BorkCoin(parentContract).eliteBorkerCount().div(2)) {
+    if (declinedVoteCount > BorkCoin(parentContract).eliteBorkerCount().div(2)) {
       state = uint(State.Rejected);
     }
   }
 
-  function hasAlreadyVoted(address _voter, address[] arr) private pure returns (bool) {
-    for(uint i = 0; i < arr.length; i++) {
-      if(_voter == arr[i]) return true;
-    }
+  function hasAlreadyVoted(address _voter) private pure returns (bool) {
+    if(approvalPool[_voter] == 1) return true;
+    if(declinePool[_voter] == 1) return true;
 
     return false;
   }
 
   function publish() external {
-    if (creator != msg.sender) revert();
     if (state != uint(State.Approved)) revert();
+    if (creator != msg.sender) revert();
 
     uint256 amountGiven;
-    for(uint i = 0; i < approvalPool.length; i++) {
+    for(uint i = 0; i < approvedVoteCount; i++) {
       amountGiven = amountGiven.add(1);
-      if(approvalPool[i] == creator) balances[approvalPool[i]] = balances[approvalPool[i]].add(1);
+      if(approvers[i] == creator) balances[approvers[i]] = balances[approvers[i]].add(1);
     }
 
     amountGiven = amountGiven.add(1);
