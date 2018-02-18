@@ -39,7 +39,7 @@ contract Bork {
       return balances[_owner];
   }
 
-  function retrieveBorkData() public returns (int[]) {
+  function retrieveBorkData() external view returns (int[]) {
     if (balances[msg.sender] <= 0) revert();
     return data;
   }
@@ -81,13 +81,13 @@ contract Bork {
     forSale[_seller] = forSale[_seller].sub(_amount);
   }
 
-  function sell(uint256 _amount) {
+  function sell(uint256 _amount) external {
     if (balances[msg.sender] < _amount) revert();
     transferFrom(msg.sender, this, _amount);
     forSale[msg.sender] = forSale[msg.sender].add(_amount);
   }
 
-  function cancelSale() {
+  function cancelSale() external {
     if (forSale[msg.sender] <= 0) revert();
      transferFrom(this, msg.sender, forSale[msg.sender]);
     forSale[msg.sender] = 0;
@@ -122,7 +122,7 @@ contract Bork {
     return false;
   }
 
-  function publish() public {
+  function publish() external {
     if (creator != msg.sender) revert();
     if (state != uint(State.Approved)) revert();
 
