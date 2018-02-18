@@ -10,24 +10,25 @@ contract Bork {
   uint256 public totalSupply;
   int[] private data;
   address public creator;
-  uint256 public price;
   address[] private approvalPool;
   address[] private declinePool;
   enum State { Pending, Approved, Rejected, Published }
   uint private state;
   address[] private committee;
   uint public created;
+  uint256 public startingPrice;
 
   mapping(address => uint256) public forSale;
+  mapping(address => uint256) public pricePerCoin;
   mapping(address => uint256) public balances;
 
-  function Bork(address _creator, address[] _committee, uint256 _price, string _type, string _name, uint256 _totalSupply, int[] _data) public {
+  function Bork(address _creator, address[] _committee, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, int[] _data) public {
     name = _name;
     totalSupply = _totalSupply;
     data = _data;
     creator = _creator;
     data_type = _type;
-    price = _price;
+    startingPrice = _pricePerCoin;
     state = uint(State.Pending);
     committee = _committee;
     created = now;
@@ -80,29 +81,33 @@ contract Bork {
   }
 
   function buy(uint256 _amount, address _seller) external payable {
-    if (msg.value != price) revert();
-    if (_amount.mul(price) != msg.value) revert();
     if (state != uint(State.Published)) revert();
-
-    if (balances[msg.sender].add(_amount) > totalSupply) revert();
+    if (_amount.mul(pricePerCoin[_seller]) != msg.value) revert();
+    if (forSale[_seller] < _amount) revert();
 
     /* send the ether to the rich dude */
     _seller.transfer(msg.value);
 
     transferFrom(this, msg.sender, _amount);
     forSale[_seller] = forSale[_seller].sub(_amount);
+
+    if (forSale[_seller] <= 0) {
+      pricePerCoin[_seller] = 0;
+    }
   }
 
-  function sell(uint256 _amount) external {
+  function sell(uint256 _amount, uint256 _price) external {
     if (balances[msg.sender] < _amount) revert();
     transferFrom(msg.sender, this, _amount);
     forSale[msg.sender] = forSale[msg.sender].add(_amount);
+    pricePerCoin[msg.sender] = _price;
   }
 
   function cancelSale() external {
     if (forSale[msg.sender] <= 0) revert();
-     transferFrom(this, msg.sender, forSale[msg.sender]);
+    transferFrom(this, msg.sender, forSale[msg.sender]);
     forSale[msg.sender] = 0;
+    pricePerCoin[msg.sender] = 0;
   }
 
   function approve(address _approver) onlyCommittee external {
@@ -147,7 +152,7 @@ contract Bork {
     amountGiven = amountGiven.add(1);
     balances[creator] = balances[creator].add(1);
 
-    this.sell(totalSupply.sub(amountGiven));
+    this.sell(totalSupply.sub(amountGiven), startingPrice);
 
     state = uint(State.Published);
   }
