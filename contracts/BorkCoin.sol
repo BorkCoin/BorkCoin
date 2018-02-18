@@ -54,7 +54,7 @@ contract Bork {
     _;
   }
 
-  function transferFrom(address _from, address _to, uint256 _value) external {
+  function transferFrom(address _from, address _to, uint256 _value) private {
     if (_to == 0x0) revert();
     if (balances[_from] < _value) revert();
     if (balances[_to].add(_value) < balances[_to]) revert();
@@ -64,7 +64,7 @@ contract Bork {
   }
 
   function transfer(address _to, uint256 _value) external {
-    this.transferFrom(msg.sender, _to, _value);
+    transferFrom(msg.sender, _to, _value);
   }
 
   function buy(uint256 _amount, address _seller) external payable {
@@ -74,19 +74,22 @@ contract Bork {
 
     if (balances[msg.sender].add(_amount) > totalSupply) revert();
 
-    this.transferFrom(this, msg.sender, _amount);
-    forSale[this] = forSale[this].sub(_amount);
+    /* send the ether to the rich dude */
+    _seller.transfer(msg.value);
+
+    transferFrom(this, msg.sender, _amount);
+    forSale[_seller] = forSale[_seller].sub(_amount);
   }
 
   function sell(uint256 _amount) {
     if (balances[msg.sender] < _amount) revert();
-    this.transfer(this, _amount);
+    transferFrom(msg.sender, this, _amount);
     forSale[msg.sender] = forSale[msg.sender].add(_amount);
   }
 
   function cancelSale() {
     if (forSale[msg.sender] <= 0) revert();
-    this.transferFrom(this, msg.sender, forSale[msg.sender]);
+     transferFrom(this, msg.sender, forSale[msg.sender]);
     forSale[msg.sender] = 0;
   }
 
