@@ -28,7 +28,6 @@ contract Bork {
   mapping(address => uint) public declinePool;
   uint public declinedVoteCount = 0;
 
-
   function Bork(address _parentContract, address _creator, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, int[] _data) public {
     name = _name;
     totalSupply = _totalSupply;
