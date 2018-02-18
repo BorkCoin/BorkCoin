@@ -18,6 +18,7 @@ contract Bork {
   address[] private committee;
   uint public created;
 
+  mapping(address => uint256) public forSale;
   mapping(address => uint256) public balances;
 
   function Bork(address _creator, address[] _committee, uint256 _price, string _type, string _name, uint256 _totalSupply, int[] _data) public {
@@ -38,6 +39,11 @@ contract Bork {
       return balances[_owner];
   }
 
+  function retrieveBorkData() public returns (int[]) {
+    if (balances[msg.sender] <= 0) revert();
+    return data;
+  }
+
   modifier onlyCommittee() {
     bool exists = false;
     for(uint i = 0; i < committee.length; i++) {
@@ -48,22 +54,40 @@ contract Bork {
     _;
   }
 
-  function transfer(address _to, uint256 _value) external {
+  function transferFrom(address _from, address _to, uint256 _value) external {
     if (_to == 0x0) revert();
-    if (balances[msg.sender] < _value) revert();
+    if (balances[_from] < _value) revert();
     if (balances[_to].add(_value) < balances[_to]) revert();
     if (state != uint(State.Published)) revert();
     balances[_to] = balances[_to].add(_value);
-    balances[msg.sender] = balances[msg.sender].sub(_value);
+    balances[_from] = balances[_from].sub(_value);
   }
 
-  function buy() external payable {
-    if (msg.sender == 0x0) revert();
-    if (msg.value != price) revert();
-    if (state != uint(State.Published)) revert();
-    if (balances[msg.sender].add(1) > totalSupply) revert();
+  function transfer(address _to, uint256 _value) external {
+    this.transferFrom(msg.sender, _to, _value);
+  }
 
-    balances[msg.sender] = balances[msg.sender].add(1);
+  function buy(uint256 _amount, address _seller) external payable {
+    if (msg.value != price) revert();
+    if (_amount.mul(price) != msg.value) revert();
+    if (state != uint(State.Published)) revert();
+
+    if (balances[msg.sender].add(_amount) > totalSupply) revert();
+
+    this.transferFrom(this, msg.sender, _amount);
+    forSale[this] = forSale[this].sub(_amount);
+  }
+
+  function sell(uint256 _amount) {
+    if (balances[msg.sender] < _amount) revert();
+    this.transfer(this, _amount);
+    forSale[msg.sender] = forSale[msg.sender].add(_amount);
+  }
+
+  function cancelSale() {
+    if (forSale[msg.sender] <= 0) revert();
+    this.transferFrom(this, msg.sender, forSale[msg.sender]);
+    forSale[msg.sender] = 0;
   }
 
   function approve(address _approver) onlyCommittee external {
@@ -99,11 +123,17 @@ contract Bork {
     if (creator != msg.sender) revert();
     if (state != uint(State.Approved)) revert();
 
+    uint256 amountGiven;
     for(uint i = 0; i < approvalPool.length; i++) {
+      amountGiven = amountGiven.add(1);
       if(approvalPool[i] == creator) balances[approvalPool[i]] = balances[approvalPool[i]].add(1);
     }
 
+    amountGiven = amountGiven.add(1);
     balances[creator] = balances[creator].add(1);
+
+    this.sell(totalSupply.sub(amountGiven));
+
     state = uint(State.Published);
   }
 
@@ -187,6 +217,6 @@ contract BorkCoin is Ownable {
     }
 
     return false;
-}
+  }
 
 }
