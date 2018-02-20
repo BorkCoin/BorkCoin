@@ -3,12 +3,23 @@ pragma solidity ^0.4.19;
 import './SafeMath.sol';
 import './Ownable.sol';
 
+contract BorkData {
+  int[] public data;
+
+  function BorkData(int[] _data) {
+    data = _data;
+  }
+
+  function download() external returns (int[]) {
+    return data;
+  }
+}
+
 contract Bork {
   using SafeMath for uint256;
   string public name;
   string public data_type;
   uint256 public totalSupply;
-  int[] private data;
   address public creator;
 
   enum State { Pending, Approved, Rejected, Published }
@@ -16,6 +27,7 @@ contract Bork {
   address private parentContract;
   uint public created;
   uint256 public startingPrice;
+  address dataContract;
 
   mapping(address => uint256) public forSale;
   mapping(address => uint256) public pricePerCoin;
@@ -28,27 +40,22 @@ contract Bork {
   mapping(address => uint) public declinePool;
   uint public declinedVoteCount = 0;
 
-  function Bork(address _parentContract, address _creator, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, int[] _data) public {
+  function Bork(address _parentContract, address _creator, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, address _dataContract) public {
     name = _name;
     totalSupply = _totalSupply;
-    data = _data;
     creator = _creator;
     data_type = _type;
     startingPrice = _pricePerCoin;
     state = uint(State.Pending);
     created = now;
     parentContract = _parentContract;
+    dataContract = _dataContract;
 
     if (_totalSupply < 5) revert(); // One for the approvers, one for the creator
   }
 
   function balanceOf(address _owner) external view returns (uint256 balance) {
       return balances[_owner];
-  }
-
-  function retrieveBorkData() external view returns (int[]) {
-    if (balances[msg.sender] <= 0) revert();
-    return data;
   }
 
   function transferFrom(address _from, address _to, uint256 _value) private {
@@ -193,11 +200,10 @@ contract BorkCoin is Ownable {
     eliteBorkers[_loser] = 0;
   }
 
-  function createBork(string _name, uint256 _price, string _type, uint256 _totalSupply, int[] _data) public {
+  function addBork(address _bork, address _data) public {
     // TODO: Check if name already exists???
     if (borks.length > maximumBorks) revert();
-    address newBork = new Bork(this, msg.sender, _price, _type, _name, _totalSupply, _data);
-    borks.push(newBork);
+    borks.push(_bork);
   }
 
   function isEliteBorker(address _address) public view returns (bool) {
