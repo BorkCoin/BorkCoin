@@ -4,7 +4,7 @@ import './SafeMath.sol';
 import './Ownable.sol';
 
 contract BorkData {
-  int[] public data;
+  int[] private data;
 
   function BorkData(int[] _data) {
     data = _data;
@@ -19,15 +19,15 @@ contract Bork {
   using SafeMath for uint256;
   string public name;
   string public data_type;
+  address public parentContract;
+  address public dataContract;
+  uint256 public startingPrice;
   uint256 public totalSupply;
   address public creator;
+  uint public created;
 
   enum State { Pending, Approved, Rejected, Published }
-  uint private state;
-  address private parentContract;
-  uint public created;
-  uint256 public startingPrice;
-  address dataContract;
+  uint public state;
 
   mapping(address => uint256) public forSale;
   mapping(address => uint256) public pricePerCoin;
@@ -159,12 +159,11 @@ contract BorkCoin is Ownable {
   string public name = "Bork Coin";
   string public symbol = "BORK";
   uint256 public decimals = 0;
+
   address[] public borks;
-  mapping(address => uint256) public borkIndex;
 
   enum State { Pending, Approved, Rejected, Published }
 
-  uint public maximumBorks = 20;
   uint public eliteBorkerCount;
   mapping(address => uint256) public eliteBorkers; // Starts 0 if not elite. 1 if elite
   uint public maximumEliteBorkers = 5;
@@ -200,9 +199,9 @@ contract BorkCoin is Ownable {
     eliteBorkers[_loser] = 0;
   }
 
-  function addBork(address _bork, address _data) public {
-    // TODO: Check if name already exists???
-    if (borks.length > maximumBorks) revert();
+  function addBork(address _bork) public {
+    if (Bork(_bork).parentContract() != address(this)) revert();
+    if (Bork(_bork).state() != uint(State.Published)) revert();
     borks.push(_bork);
   }
 
