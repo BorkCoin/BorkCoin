@@ -40,7 +40,7 @@ contract Bork {
   mapping(address => uint) public declinePool;
   uint public declinedVoteCount = 0;
 
-  function Bork(address _parentContract, address _creator, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, address _dataContract) public {
+  function Bork(address _parentContract, address _creator, uint256 _pricePerCoin, string _type, string _name, uint256 _totalSupply, int[] _data) public {
     name = _name;
     totalSupply = _totalSupply;
     creator = _creator;
@@ -49,7 +49,7 @@ contract Bork {
     state = uint(State.Pending);
     created = now;
     parentContract = _parentContract;
-    dataContract = _dataContract;
+    dataContract = new BorkData(_data);
 
     if (_totalSupply < 5) revert(); // One for the approvers, one for the creator
   }
